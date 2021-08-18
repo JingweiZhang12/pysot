@@ -88,7 +88,7 @@ def main(instanc_size=511, num_threads=24):
     crop_path = './crop{:d}'.format(instanc_size)
     if not isdir(crop_path): mkdir(crop_path)
     VID_base_path = './ILSVRC'
-    ann_base_path = join(VID_base_path, 'Annotations/DET/train/')
+    ann_base_path = join(VID_base_path, 'Annotations/')
     sub_sets = ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i')
     for sub_set in sub_sets:
         sub_set_base_path = join(ann_base_path, sub_set)

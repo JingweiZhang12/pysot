@@ -28,11 +28,12 @@ if pyv[0] == '3':
 
 
 class SubDataset(object):
+
     def __init__(self, name, root, anno, frame_range, num_use, start_idx):
         cur_path = os.path.dirname(os.path.realpath(__file__))
         self.name = name
-        self.root = os.path.join(cur_path, '../../', root)
-        self.anno = os.path.join(cur_path, '../../', anno)
+        self.root = os.path.abspath(os.path.join(cur_path, '../../', root))
+        self.anno = os.path.abspath(os.path.join(cur_path, '../../', anno))
         self.frame_range = frame_range
         self.num_use = num_use
         self.start_idx = start_idx
@@ -44,8 +45,8 @@ class SubDataset(object):
         for video in list(meta_data.keys()):
             for track in meta_data[video]:
                 frames = meta_data[video][track]
-                frames = list(map(int,
-                              filter(lambda x: x.isdigit(), frames.keys())))
+                frames = list(
+                    map(int, filter(lambda x: x.isdigit(), frames.keys())))
                 frames.sort()
                 meta_data[video][track]['frames'] = frames
                 if len(frames) <= 0:
@@ -89,8 +90,8 @@ class SubDataset(object):
 
     def log(self):
         logger.info("{} start-index {} select [{}/{}] path_format {}".format(
-            self.name, self.start_idx, self.num_use,
-            self.num, self.path_format))
+            self.name, self.start_idx, self.num_use, self.num,
+            self.path_format))
 
     def shuffle(self):
         lists = list(range(self.start_idx, self.start_idx + self.num))
@@ -116,7 +117,7 @@ class SubDataset(object):
         frames = track_info['frames']
         template_frame = np.random.randint(0, len(frames))
         left = max(template_frame - self.frame_range, 0)
-        right = min(template_frame + self.frame_range, len(frames)-1) + 1
+        right = min(template_frame + self.frame_range, len(frames) - 1) + 1
         search_range = frames[left:right]
         template_frame = frames[template_frame]
         search_frame = np.random.choice(search_range)
@@ -139,7 +140,8 @@ class SubDataset(object):
 
 
 class TrkDataset(Dataset):
-    def __init__(self,):
+
+    def __init__(self, ):
         super(TrkDataset, self).__init__()
 
         desired_size = (cfg.TRAIN.SEARCH_SIZE - cfg.TRAIN.EXEMPLAR_SIZE) / \
@@ -156,35 +158,25 @@ class TrkDataset(Dataset):
         self.num = 0
         for name in cfg.DATASET.NAMES:
             subdata_cfg = getattr(cfg.DATASET, name)
-            sub_dataset = SubDataset(
-                    name,
-                    subdata_cfg.ROOT,
-                    subdata_cfg.ANNO,
-                    subdata_cfg.FRAME_RANGE,
-                    subdata_cfg.NUM_USE,
-                    start
-                )
+            sub_dataset = SubDataset(name, subdata_cfg.ROOT, subdata_cfg.ANNO,
+                                     subdata_cfg.FRAME_RANGE,
+                                     subdata_cfg.NUM_USE, start)
             start += sub_dataset.num
             self.num += sub_dataset.num_use
 
             sub_dataset.log()
             self.all_dataset.append(sub_dataset)
-
         # data augmentation
-        self.template_aug = Augmentation(
-                cfg.DATASET.TEMPLATE.SHIFT,
-                cfg.DATASET.TEMPLATE.SCALE,
-                cfg.DATASET.TEMPLATE.BLUR,
-                cfg.DATASET.TEMPLATE.FLIP,
-                cfg.DATASET.TEMPLATE.COLOR
-            )
-        self.search_aug = Augmentation(
-                cfg.DATASET.SEARCH.SHIFT,
-                cfg.DATASET.SEARCH.SCALE,
-                cfg.DATASET.SEARCH.BLUR,
-                cfg.DATASET.SEARCH.FLIP,
-                cfg.DATASET.SEARCH.COLOR
-            )
+        self.template_aug = Augmentation(cfg.DATASET.TEMPLATE.SHIFT,
+                                         cfg.DATASET.TEMPLATE.SCALE,
+                                         cfg.DATASET.TEMPLATE.BLUR,
+                                         cfg.DATASET.TEMPLATE.FLIP,
+                                         cfg.DATASET.TEMPLATE.COLOR)
+        self.search_aug = Augmentation(cfg.DATASET.SEARCH.SHIFT,
+                                       cfg.DATASET.SEARCH.SCALE,
+                                       cfg.DATASET.SEARCH.BLUR,
+                                       cfg.DATASET.SEARCH.FLIP,
+                                       cfg.DATASET.SEARCH.COLOR)
         videos_per_epoch = cfg.DATASET.VIDEOS_PER_EPOCH
         self.num = videos_per_epoch if videos_per_epoch > 0 else self.num
         self.num *= cfg.TRAIN.EPOCH
@@ -213,18 +205,18 @@ class TrkDataset(Dataset):
     def _get_bbox(self, image, shape):
         imh, imw = image.shape[:2]
         if len(shape) == 4:
-            w, h = shape[2]-shape[0], shape[3]-shape[1]
+            w, h = shape[2] - shape[0], shape[3] - shape[1]
         else:
             w, h = shape
         context_amount = 0.5
         exemplar_size = cfg.TRAIN.EXEMPLAR_SIZE
-        wc_z = w + context_amount * (w+h)
-        hc_z = h + context_amount * (w+h)
+        wc_z = w + context_amount * (w + h)
+        hc_z = h + context_amount * (w + h)
         s_z = np.sqrt(wc_z * hc_z)
         scale_z = exemplar_size / s_z
-        w = w*scale_z
-        h = h*scale_z
-        cx, cy = imw//2, imh//2
+        w = w * scale_z
+        h = h * scale_z
+        cx, cy = imw // 2, imh // 2
         bbox = center2corner(Center(cx, cy, w, h))
         return bbox
 
@@ -248,32 +240,28 @@ class TrkDataset(Dataset):
         # get image
         template_image = cv2.imread(template[0])
         search_image = cv2.imread(search[0])
-
+        h,w = template_image.shape[:2]
         # get bounding box
         template_box = self._get_bbox(template_image, template[1])
         search_box = self._get_bbox(search_image, search[1])
 
         # augmentation
-        template, _ = self.template_aug(template_image,
-                                        template_box,
-                                        cfg.TRAIN.EXEMPLAR_SIZE,
-                                        gray=gray)
+        template, _ = self.template_aug(
+            template_image, template_box, cfg.TRAIN.EXEMPLAR_SIZE, gray=gray)
 
-        search, bbox = self.search_aug(search_image,
-                                       search_box,
-                                       cfg.TRAIN.SEARCH_SIZE,
-                                       gray=gray)
+        search, bbox = self.search_aug(
+            search_image, search_box, cfg.TRAIN.SEARCH_SIZE, gray=gray)
 
         # get labels
         cls, delta, delta_weight, overlap = self.anchor_target(
-                bbox, cfg.TRAIN.OUTPUT_SIZE, neg)
+            bbox, cfg.TRAIN.OUTPUT_SIZE, neg)
         template = template.transpose((2, 0, 1)).astype(np.float32)
         search = search.transpose((2, 0, 1)).astype(np.float32)
         return {
-                'template': template,
-                'search': search,
-                'label_cls': cls,
-                'label_loc': delta,
-                'label_loc_weight': delta_weight,
-                'bbox': np.array(bbox)
-                }
+            'template': template,
+            'search': search,
+            'label_cls': cls,
+            'label_loc': delta,
+            'label_loc_weight': delta_weight,
+            'bbox': np.array(bbox)
+        }

@@ -9,7 +9,7 @@ import sys
 import time
 
 VID_base_path = './ILSVRC2015'
-ann_base_path = join(VID_base_path, 'Annotations/VID/train/')
+ann_base_path = join(VID_base_path, 'Annotations/')
 sub_sets = sorted({'a', 'b', 'c', 'd', 'e'})
 
 

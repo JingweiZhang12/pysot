@@ -4,9 +4,9 @@ import json
 import glob
 import xml.etree.ElementTree as ET
 
-VID_base_path = './ILSVRC2015'
-ann_base_path = join(VID_base_path, 'Annotations/VID/train/')
-img_base_path = join(VID_base_path, 'Data/VID/train/')
+VID_base_path = './ILSVRC'
+ann_base_path = join(VID_base_path, 'Annotations/')
+img_base_path = join(VID_base_path, 'Data/')
 sub_sets = sorted({'a', 'b', 'c', 'd', 'e'})
 
 vid = []

@@ -10,8 +10,10 @@ import pandas as pd
 d_sets = ['yt_bb_detection_validation', 'yt_bb_detection_train']
 
 # Column names for detection CSV files
-col_names = ['youtube_id', 'timestamp_ms','class_id','class_name',
-             'object_id','object_presence','xmin','xmax','ymin','ymax']
+col_names = [
+    'youtube_id', 'timestamp_ms', 'class_id', 'class_name', 'object_id',
+    'object_presence', 'xmin', 'xmax', 'ymin', 'ymax'
+]
 
 instanc_size = 511
 crop_path = './crop{:d}'.format(instanc_size)
@@ -23,18 +25,21 @@ def parse_and_sched(dl_dir='.'):
     for d_set in d_sets:
 
         # Make the directory for this dataset
-        d_set_dir = dl_dir+'/'+d_set+'/'
+        d_set_dir = dl_dir + '/' + d_set + '/'
 
         # Parse csv data using pandas
-        print (d_set+': Parsing annotations into clip data...')
-        df = pd.DataFrame.from_csv(d_set+'.csv', header=None, index_col=False)
+        print(d_set + ': Parsing annotations into clip data...')
+        df = pd.read_csv(
+            d_set + '.csv',
+            header=None,
+            index_col=False,)
         df.columns = col_names
 
         # Get list of unique video files
         vids = df['youtube_id'].unique()
 
         for vid in vids:
-            data = df[df['youtube_id']==vid]
+            data = df[df['youtube_id'] == vid]
             for index, row in data.iterrows():
                 youtube_id, timestamp_ms, class_id, class_name, \
                 object_id, object_presence, x1, x2, y1, y2 = row
@@ -50,7 +55,9 @@ def parse_and_sched(dl_dir='.'):
                 obj = '%02d' % (int(object_id))
                 video = join(d_set_dir + str(class_id), youtube_id)
 
-                if not exists(join(crop_path, video, '{}.{}.x.jpg'.format(frame, obj))):
+                if not exists(
+                        join(crop_path, video, '{}.{}.x.jpg'.format(
+                            frame, obj))):
                     continue
 
                 if video not in js:
@@ -64,7 +71,7 @@ def parse_and_sched(dl_dir='.'):
         else:
             json.dump(js, open('val.json', 'w'), indent=4, sort_keys=True)
         js = {}
-        print(d_set+': All videos downloaded' )
+        print(d_set + ': All videos downloaded')
 
 
 if __name__ == '__main__':

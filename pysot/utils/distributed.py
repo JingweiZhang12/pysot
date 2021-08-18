@@ -8,6 +8,7 @@ from __future__ import unicode_literals
 import os
 import socket
 import logging
+import subprocess
 
 import torch
 import torch.nn as nn
@@ -29,6 +30,7 @@ def average_reduce(v):
 
 
 class DistModule(nn.Module):
+
     def __init__(self, module, bn_method=0):
         super(DistModule, self).__init__()
         self.module = module
@@ -74,18 +76,45 @@ def broadcast_buffers(model, method=0):
 inited = False
 
 
-def _dist_init():
+def _dist_init(port=None):
     '''
+    Initialize slurm distributed training environment.
+
+    If argument ``port`` is not specified, then the master port will be system
+    environment variable ``MASTER_PORT``. If ``MASTER_PORT`` is not in system
+    environment variable, then a default port ``29500`` will be used.
+    
     if guess right:
         ntasks: world_size (process num)
         proc_id: rank
     '''
-    rank = int(os.environ['RANK'])
+    # rank = int(os.environ['RANK'])
+
+    proc_id = int(os.environ['SLURM_PROCID'])
+    ntasks = int(os.environ['SLURM_NTASKS'])
+    node_list = os.environ['SLURM_NODELIST']
     num_gpus = torch.cuda.device_count()
-    torch.cuda.set_device(rank % num_gpus)
+    torch.cuda.set_device(proc_id % num_gpus)
+    addr = subprocess.getoutput(
+        f'scontrol show hostname {node_list} | head -n1')
+    # specify master port
+    if port is not None:
+        os.environ['MASTER_PORT'] = str(port)
+    elif 'MASTER_PORT' in os.environ:
+        pass  # use MASTER_PORT in the environment variable
+    else:
+        # 29500 is torch.distributed default port
+        os.environ['MASTER_PORT'] = '29500'
+    # use MASTER_ADDR in the environment variable if it already exists
+    if 'MASTER_ADDR' not in os.environ:
+        os.environ['MASTER_ADDR'] = addr
+    os.environ['WORLD_SIZE'] = str(ntasks)
+    os.environ['LOCAL_RANK'] = str(proc_id % num_gpus)
+    os.environ['RANK'] = str(proc_id)
+
     dist.init_process_group(backend='nccl')
     world_size = dist.get_world_size()
-    return rank, world_size
+    return proc_id, world_size
 
 
 def _get_local_ip():
@@ -115,13 +144,13 @@ def dist_init():
 
 def get_rank():
     if not inited:
-        raise(Exception('dist not inited'))
+        raise (Exception('dist not inited'))
     return rank
 
 
 def get_world_size():
     if not inited:
-        raise(Exception('dist not inited'))
+        raise (Exception('dist not inited'))
     return world_size
 
 

@@ -32,15 +32,15 @@ from pysot.models.model_builder import ModelBuilder
 from pysot.datasets.dataset import TrkDataset
 from pysot.core.config import cfg
 
+# from mmcv.runner import init_dist
 
 logger = logging.getLogger('global')
 parser = argparse.ArgumentParser(description='siamrpn tracking')
-parser.add_argument('--cfg', type=str, default='config.yaml',
-                    help='configuration of tracking')
-parser.add_argument('--seed', type=int, default=123456,
-                    help='random seed')
-parser.add_argument('--local_rank', type=int, default=0,
-                    help='compulsory for pytorch launcer')
+parser.add_argument(
+    '--cfg', type=str, default='config.yaml', help='configuration of tracking')
+parser.add_argument('--seed', type=int, default=123456, help='random seed')
+parser.add_argument(
+    '--local_rank', type=int, default=0, help='compulsory for pytorch launcer')
 args = parser.parse_args()
 
 
@@ -63,11 +63,12 @@ def build_data_loader():
     train_sampler = None
     if get_world_size() > 1:
         train_sampler = DistributedSampler(train_dataset)
-    train_loader = DataLoader(train_dataset,
-                              batch_size=cfg.TRAIN.BATCH_SIZE,
-                              num_workers=cfg.TRAIN.NUM_WORKERS,
-                              pin_memory=True,
-                              sampler=train_sampler)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=cfg.TRAIN.BATCH_SIZE,
+        num_workers=cfg.TRAIN.NUM_WORKERS,
+        pin_memory=True,
+        sampler=train_sampler)
     return train_loader
 
 
@@ -86,28 +87,40 @@ def build_opt_lr(model, current_epoch=0):
                     m.train()
 
     trainable_params = []
-    trainable_params += [{'params': filter(lambda x: x.requires_grad,
-                                           model.backbone.parameters()),
-                          'lr': cfg.BACKBONE.LAYERS_LR * cfg.TRAIN.BASE_LR}]
+    trainable_params += [{
+        'params':
+        filter(lambda x: x.requires_grad, model.backbone.parameters()),
+        'lr':
+        cfg.BACKBONE.LAYERS_LR * cfg.TRAIN.BASE_LR
+    }]
 
     if cfg.ADJUST.ADJUST:
-        trainable_params += [{'params': model.neck.parameters(),
-                              'lr': cfg.TRAIN.BASE_LR}]
+        trainable_params += [{
+            'params': model.neck.parameters(),
+            'lr': cfg.TRAIN.BASE_LR
+        }]
 
-    trainable_params += [{'params': model.rpn_head.parameters(),
-                          'lr': cfg.TRAIN.BASE_LR}]
+    trainable_params += [{
+        'params': model.rpn_head.parameters(),
+        'lr': cfg.TRAIN.BASE_LR
+    }]
 
     if cfg.MASK.MASK:
-        trainable_params += [{'params': model.mask_head.parameters(),
-                              'lr': cfg.TRAIN.BASE_LR}]
+        trainable_params += [{
+            'params': model.mask_head.parameters(),
+            'lr': cfg.TRAIN.BASE_LR
+        }]
 
     if cfg.REFINE.REFINE:
-        trainable_params += [{'params': model.refine_head.parameters(),
-                              'lr': cfg.TRAIN.LR.BASE_LR}]
+        trainable_params += [{
+            'params': model.refine_head.parameters(),
+            'lr': cfg.TRAIN.LR.BASE_LR
+        }]
 
-    optimizer = torch.optim.SGD(trainable_params,
-                                momentum=cfg.TRAIN.MOMENTUM,
-                                weight_decay=cfg.TRAIN.WEIGHT_DECAY)
+    optimizer = torch.optim.SGD(
+        trainable_params,
+        momentum=cfg.TRAIN.MOMENTUM,
+        weight_decay=cfg.TRAIN.WEIGHT_DECAY)
 
     lr_scheduler = build_lr_scheduler(optimizer, epochs=cfg.TRAIN.EPOCH)
     lr_scheduler.step(cfg.TRAIN.START_EPOCH)
@@ -115,6 +128,7 @@ def build_opt_lr(model, current_epoch=0):
 
 
 def log_grads(model, tb_writer, tb_index):
+
     def weights_grads(model):
         grad = {}
         weights = {}
@@ -131,20 +145,20 @@ def log_grads(model, tb_writer, tb_index):
         weight = weights[k]
         w_norm = weight.norm(2)
         if 'feature' in k:
-            feature_norm += _norm ** 2
+            feature_norm += _norm**2
         else:
-            rpn_norm += _norm ** 2
+            rpn_norm += _norm**2
 
-        tb_writer.add_scalar('grad_all/'+k.replace('.', '/'),
-                             _norm, tb_index)
-        tb_writer.add_scalar('weight_all/'+k.replace('.', '/'),
-                             w_norm, tb_index)
-        tb_writer.add_scalar('w-g/'+k.replace('.', '/'),
-                             w_norm/(1e-20 + _norm), tb_index)
+        tb_writer.add_scalar('grad_all/' + k.replace('.', '/'), _norm,
+                             tb_index)
+        tb_writer.add_scalar('weight_all/' + k.replace('.', '/'), w_norm,
+                             tb_index)
+        tb_writer.add_scalar('w-g/' + k.replace('.', '/'),
+                             w_norm / (1e-20 + _norm), tb_index)
     tot_norm = feature_norm + rpn_norm
-    tot_norm = tot_norm ** 0.5
-    feature_norm = feature_norm ** 0.5
-    rpn_norm = rpn_norm ** 0.5
+    tot_norm = tot_norm**0.5
+    feature_norm = feature_norm**0.5
+    rpn_norm = rpn_norm**0.5
 
     tb_writer.add_scalar('grad/tot', tot_norm, tb_index)
     tb_writer.add_scalar('grad/feature', feature_norm, tb_index)
@@ -158,7 +172,7 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
     average_meter = AverageMeter()
 
     def is_valid_number(x):
-        return not(math.isnan(x) or math.isinf(x) or x > 1e4)
+        return not (math.isnan(x) or math.isinf(x) or x > 1e4)
 
     world_size = get_world_size()
     num_per_epoch = len(train_loader.dataset) // \
@@ -178,10 +192,12 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
 
             if get_rank() == 0:
                 torch.save(
-                        {'epoch': epoch,
-                         'state_dict': model.module.state_dict(),
-                         'optimizer': optimizer.state_dict()},
-                        cfg.TRAIN.SNAPSHOT_DIR+'/checkpoint_e%d.pth' % (epoch))
+                    {
+                        'epoch': epoch,
+                        'state_dict': model.module.state_dict(),
+                        'optimizer': optimizer.state_dict()
+                    },
+                    cfg.TRAIN.SNAPSHOT_DIR + '/checkpoint_e%d.pth' % (epoch))
 
             if epoch == cfg.TRAIN.EPOCH:
                 return
@@ -193,14 +209,14 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
 
             lr_scheduler.step(epoch)
             cur_lr = lr_scheduler.get_cur_lr()
-            logger.info('epoch: {}'.format(epoch+1))
+            logger.info('epoch: {}'.format(epoch + 1))
 
         tb_idx = idx
         if idx % num_per_epoch == 0 and idx != 0:
             for idx, pg in enumerate(optimizer.param_groups):
-                logger.info('epoch {} lr {}'.format(epoch+1, pg['lr']))
+                logger.info('epoch {} lr {}'.format(epoch + 1, pg['lr']))
                 if rank == 0:
-                    tb_writer.add_scalar('lr/group{}'.format(idx+1),
+                    tb_writer.add_scalar('lr/group{}'.format(idx + 1),
                                          pg['lr'], tb_idx)
 
         data_time = average_reduce(time.time() - end)
@@ -235,19 +251,17 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
             for k, v in batch_info.items():
                 tb_writer.add_scalar(k, v, tb_idx)
 
-            if (idx+1) % cfg.TRAIN.PRINT_FREQ == 0:
+            if (idx + 1) % cfg.TRAIN.PRINT_FREQ == 0:
                 info = "Epoch: [{}][{}/{}] lr: {:.6f}\n".format(
-                            epoch+1, (idx+1) % num_per_epoch,
-                            num_per_epoch, cur_lr)
+                    epoch + 1, (idx + 1) % num_per_epoch, num_per_epoch,
+                    cur_lr)
                 for cc, (k, v) in enumerate(batch_info.items()):
                     if cc % 2 == 0:
-                        info += ("\t{:s}\t").format(
-                                getattr(average_meter, k))
+                        info += ("\t{:s}\t").format(getattr(average_meter, k))
                     else:
-                        info += ("{:s}\n").format(
-                                getattr(average_meter, k))
+                        info += ("{:s}\n").format(getattr(average_meter, k))
                 logger.info(info)
-                print_speed(idx+1+start_epoch*num_per_epoch,
+                print_speed(idx + 1 + start_epoch * num_per_epoch,
                             average_meter.batch_time.avg,
                             cfg.TRAIN.EPOCH * num_per_epoch)
         end = time.time()
@@ -290,8 +304,7 @@ def main():
     train_loader = build_data_loader()
 
     # build optimizer and lr_scheduler
-    optimizer, lr_scheduler = build_opt_lr(model,
-                                           cfg.TRAIN.START_EPOCH)
+    optimizer, lr_scheduler = build_opt_lr(model, cfg.TRAIN.START_EPOCH)
 
     # resume training
     if cfg.TRAIN.RESUME:

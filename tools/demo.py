@@ -20,8 +20,9 @@ torch.set_num_threads(1)
 parser = argparse.ArgumentParser(description='tracking demo')
 parser.add_argument('--config', type=str, help='config file')
 parser.add_argument('--snapshot', type=str, help='model name')
-parser.add_argument('--video_name', default='', type=str,
-                    help='videos or image files')
+parser.add_argument(
+    '--video_name', default='', type=str, help='videos or image files')
+parser.add_argument('--output', default='', type=str, help='video save path')
 args = parser.parse_args()
 
 
@@ -48,8 +49,8 @@ def get_frames(video_name):
                 break
     else:
         images = glob(os.path.join(video_name, '*.jp*'))
-        images = sorted(images,
-                        key=lambda x: int(x.split('/')[-1].split('.')[0]))
+        images = sorted(
+            images, key=lambda x: int(x.split('/')[-1].split('.')[0]))
         for img in images:
             frame = cv2.imread(img)
             yield frame
@@ -65,8 +66,9 @@ def main():
     model = ModelBuilder()
 
     # load model
-    model.load_state_dict(torch.load(args.snapshot,
-        map_location=lambda storage, loc: storage.cpu()))
+    model.load_state_dict(
+        torch.load(
+            args.snapshot, map_location=lambda storage, loc: storage.cpu()))
     model.eval().to(device)
 
     # build tracker
@@ -77,32 +79,55 @@ def main():
         video_name = args.video_name.split('/')[-1].split('.')[0]
     else:
         video_name = 'webcam'
-    cv2.namedWindow(video_name, cv2.WND_PROP_FULLSCREEN)
+    # cv2.namedWindow(video_name, cv2.WND_PROP_FULLSCREEN)
+
+    cap = cv2.VideoCapture(args.video_name)
+
+    if args.output is not None:
+        save_out_video = True
+
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        videoWriter = cv2.VideoWriter(args.output, fourcc, fps, size)
+
     for frame in get_frames(args.video_name):
         if first_frame:
-            try:
-                init_rect = cv2.selectROI(video_name, frame, False, False)
-            except:
-                exit()
+            # try:
+            #     init_rect = cv2.selectROI(video_name, frame, False, False)
+            # except:
+            #     exit()
+            init_rect = [318, 141, 109, 116]  # demo_bag.avi [x,y,w,h]
             tracker.init(frame, init_rect)
             first_frame = False
         else:
             outputs = tracker.track(frame)
             if 'polygon' in outputs:
                 polygon = np.array(outputs['polygon']).astype(np.int32)
-                cv2.polylines(frame, [polygon.reshape((-1, 1, 2))],
-                              True, (0, 255, 0), 3)
+                cv2.polylines(frame, [polygon.reshape((-1, 1, 2))], True,
+                              (0, 255, 0), 3)
                 mask = ((outputs['mask'] > cfg.TRACK.MASK_THERSHOLD) * 255)
                 mask = mask.astype(np.uint8)
-                mask = np.stack([mask, mask*255, mask]).transpose(1, 2, 0)
+                mask = np.stack([mask, mask * 255, mask]).transpose(1, 2, 0)
                 frame = cv2.addWeighted(frame, 0.77, mask, 0.23, -1)
             else:
                 bbox = list(map(int, outputs['bbox']))
                 cv2.rectangle(frame, (bbox[0], bbox[1]),
-                              (bbox[0]+bbox[2], bbox[1]+bbox[3]),
+                              (bbox[0] + bbox[2], bbox[1] + bbox[3]),
                               (0, 255, 0), 3)
-            cv2.imshow(video_name, frame)
-            cv2.waitKey(40)
+                # cv2.imshow(video_name, frame)
+                # cv2.waitKey(40)
+
+                # if save_out_video:
+                #     videoWriter.write(frame)
+                # origin_bbox = outputs['bbox']
+                # print([origin_bbox[0], origin_bbox[1], origin_bbox[0] + origin_bbox[2], origin_bbox[1] + origin_bbox[3]])
+
+    cap.release()
+    # if save_out_video:
+    #     videoWriter.release()
+    cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
