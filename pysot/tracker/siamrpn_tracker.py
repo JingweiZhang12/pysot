@@ -151,7 +151,6 @@ class SiamRPNTracker(SiameseTracker):
         # clip boundary
         cx, cy, width, height = self._bbox_clip(cx, cy, width, height,
                                                 img.shape[:2])
-        print([cx, cy, width, height])
         # udpate state
         self.center_pos = np.array([cx, cy])
         self.size = np.array([width, height])

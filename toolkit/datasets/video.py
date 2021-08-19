@@ -1,3 +1,4 @@
+from operator import xor
 import os
 import cv2
 import re
@@ -15,7 +16,7 @@ class Video(object):
         self.gt_traj = gt_rect
         self.attr = attr
         self.pred_trajs = {}
-        self.img_names = [os.path.join(os.path.abspath(root), os.path.abspath(x)) for x in img_names]
+        self.img_names = [os.path.join(os.path.abspath(root), x) for x in img_names]
         self.imgs = None
 
         if load_img:

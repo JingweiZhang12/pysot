@@ -49,9 +49,9 @@ __C.TRAIN.RESUME = ''
 
 __C.TRAIN.PRETRAINED = ''
 
-__C.TRAIN.LOG_DIR = './logs'
+__C.TRAIN.LOG_DIR = './logs_withYTBB'
 
-__C.TRAIN.SNAPSHOT_DIR = './snapshot'
+__C.TRAIN.SNAPSHOT_DIR = './snapshot_withYTBB'
 
 __C.TRAIN.EPOCH = 20
 
